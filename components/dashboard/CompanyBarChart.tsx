@@ -1,0 +1,533 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  OutlinedInput,
+  Paper,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
+
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Tooltip,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend
+);
+
+type Dimension = 'level' | 'country' | 'city';
+
+type Company = {
+  id: string;
+  level: string | null;
+  country: string | null;
+  city: string | null;
+};
+
+type ChartResult = {
+  dimension: Dimension;
+  totalCompanies: number;
+  data: Array<{
+    label: string;
+    count: number;
+  }>;
+};
+
+type FilterState = {
+  level: string[];
+  country: string[];
+  city: string[];
+  foundedYearStart: string;
+  foundedYearEnd: string;
+  annualRevenueMin: string;
+  annualRevenueMax: string;
+  employeesMin: string;
+  employeesMax: string;
+};
+
+const emptyFilters: FilterState = {
+  level: [],
+  country: [],
+  city: [],
+  foundedYearStart: '',
+  foundedYearEnd: '',
+  annualRevenueMin: '',
+  annualRevenueMax: '',
+  employeesMin: '',
+  employeesMax: '',
+};
+
+function toOptionalNumber(value: string) {
+  if (value.trim() === '') {
+    return undefined;
+  }
+
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+export default function CompanyBarChart() {
+  const [dimension, setDimension] = useState<Dimension>('level');
+  const [filters, setFilters] = useState<FilterState>(emptyFilters);
+
+  const [levelOptions, setLevelOptions] = useState<string[]>([]);
+  const [countryOptions, setCountryOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+
+  const [result, setResult] = useState<ChartResult>({
+    dimension: 'level',
+    totalCompanies: 0,
+    data: [],
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadFilterOptions = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3001/companies');
+      const companies: Company[] = await response.json();
+
+      if (!response.ok || !Array.isArray(companies)) {
+        return;
+      }
+
+      setLevelOptions(
+        Array.from(
+          new Set(
+            companies
+              .map((company) => company.level)
+              .filter((value): value is string => Boolean(value))
+          )
+        ).sort()
+      );
+
+      setCountryOptions(
+        Array.from(
+          new Set(
+            companies
+              .map((company) => company.country)
+              .filter((value): value is string => Boolean(value))
+          )
+        ).sort()
+      );
+
+      setCityOptions(
+        Array.from(
+          new Set(
+            companies
+              .map((company) => company.city)
+              .filter((value): value is string => Boolean(value))
+          )
+        ).sort()
+      );
+    } catch {
+      // The chart request below will display the main connection error.
+    }
+  }, []);
+
+  const fetchChartData = useCallback(
+    async (
+      selectedDimension: Dimension = dimension,
+      selectedFilters: FilterState = filters
+    ) => {
+      setLoading(true);
+      setError('');
+
+      const requestBody = {
+        dimension: selectedDimension,
+        filter: {
+          level: selectedFilters.level,
+          country: selectedFilters.country,
+          city: selectedFilters.city,
+          founded_year: {
+            start: toOptionalNumber(selectedFilters.foundedYearStart),
+            end: toOptionalNumber(selectedFilters.foundedYearEnd),
+          },
+          annual_revenue: {
+            min: toOptionalNumber(selectedFilters.annualRevenueMin),
+            max: toOptionalNumber(selectedFilters.annualRevenueMax),
+          },
+          employees: {
+            min: toOptionalNumber(selectedFilters.employeesMin),
+            max: toOptionalNumber(selectedFilters.employeesMax),
+          },
+        },
+      };
+
+      try {
+        const response = await fetch(
+          'http://localhost:3001/dashboard/companies/filter',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(data.message || 'Cannot load bar chart data');
+          return;
+        }
+
+        setResult(data);
+      } catch {
+        setError('Cannot connect to backend server');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [dimension, filters]
+  );
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, [loadFilterOptions]);
+
+  useEffect(() => {
+    fetchChartData(dimension, filters);
+    // Only reload automatically when the selected dimension changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimension]);
+
+  const handleReset = () => {
+    setFilters(emptyFilters);
+    fetchChartData(dimension, emptyFilters);
+  };
+
+  const chartData = useMemo(
+    () => ({
+      labels: result.data.map((item) => item.label),
+      datasets: [
+        {
+          label: 'Companies',
+          data: result.data.map((item) => item.count),
+          borderWidth: 1,
+        },
+      ],
+    }),
+    [result]
+  );
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const count = Number(context.parsed.y);
+            const percentage =
+              result.totalCompanies > 0
+                ? (count / result.totalCompanies) * 100
+                : 0;
+
+            return `${count} companies (${percentage.toFixed(1)}%)`;
+          },
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+        title: {
+          display: true,
+          text: 'Number of Companies',
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text:
+            dimension === 'level'
+              ? 'Company Level'
+              : dimension === 'country'
+                ? 'Country'
+                : 'City',
+        },
+      },
+    },
+  };
+
+  return (
+    <Paper sx={{ p: 3, mt: 3 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        Company Distribution
+      </Typography>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Filter company data and group results by level, country, or city
+      </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: 'repeat(2, 1fr)',
+            lg: 'repeat(4, 1fr)',
+          },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <FormControl fullWidth>
+          <InputLabel>Dimension</InputLabel>
+
+          <Select
+            value={dimension}
+            label="Dimension"
+            onChange={(event) =>
+              setDimension(event.target.value as Dimension)
+            }
+          >
+            <MenuItem value="level">Level</MenuItem>
+            <MenuItem value="country">Country</MenuItem>
+            <MenuItem value="city">City</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>Level</InputLabel>
+
+          <Select
+            multiple
+            value={filters.level}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              setFilters({
+                ...filters,
+                level:
+                  typeof value === 'string' ? value.split(',') : value,
+              });
+            }}
+            input={<OutlinedInput label="Level" />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {levelOptions.map((level) => (
+              <MenuItem key={level} value={level}>
+                {level}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>Country</InputLabel>
+
+          <Select
+            multiple
+            value={filters.country}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              setFilters({
+                ...filters,
+                country:
+                  typeof value === 'string' ? value.split(',') : value,
+              });
+            }}
+            input={<OutlinedInput label="Country" />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {countryOptions.map((country) => (
+              <MenuItem key={country} value={country}>
+                {country}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>City</InputLabel>
+
+          <Select
+            multiple
+            value={filters.city}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              setFilters({
+                ...filters,
+                city:
+                  typeof value === 'string' ? value.split(',') : value,
+              });
+            }}
+            input={<OutlinedInput label="City" />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {cityOptions.map((city) => (
+              <MenuItem key={city} value={city}>
+                {city}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Founded Year Start"
+          type="number"
+          value={filters.foundedYearStart}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              foundedYearStart: event.target.value,
+            })
+          }
+        />
+
+        <TextField
+          label="Founded Year End"
+          type="number"
+          value={filters.foundedYearEnd}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              foundedYearEnd: event.target.value,
+            })
+          }
+        />
+
+        <TextField
+          label="Annual Revenue Min"
+          type="number"
+          value={filters.annualRevenueMin}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              annualRevenueMin: event.target.value,
+            })
+          }
+        />
+
+        <TextField
+          label="Annual Revenue Max"
+          type="number"
+          value={filters.annualRevenueMax}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              annualRevenueMax: event.target.value,
+            })
+          }
+        />
+
+        <TextField
+          label="Employees Min"
+          type="number"
+          value={filters.employeesMin}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              employeesMin: event.target.value,
+            })
+          }
+        />
+
+        <TextField
+          label="Employees Max"
+          type="number"
+          value={filters.employeesMax}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              employeesMax: event.target.value,
+            })
+          }
+        />
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Button
+          variant="contained"
+          onClick={() => fetchChartData()}
+          disabled={loading}
+        >
+          Apply Filters
+        </Button>
+
+        <Button
+          variant="outlined"
+          onClick={handleReset}
+          disabled={loading}
+        >
+          Reset
+        </Button>
+      </Box>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Matching companies: {result.totalCompanies}
+      </Typography>
+
+      {loading ? (
+        <Box
+          sx={{
+            height: 400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      ) : result.data.length === 0 ? (
+        <Box
+          sx={{
+            height: 240,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Typography color="text.secondary">
+            No company data matches the selected filters
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{ height: 420 }}>
+          <Bar data={chartData} options={chartOptions} />
+        </Box>
+      )}
+    </Paper>
+  );
+}
