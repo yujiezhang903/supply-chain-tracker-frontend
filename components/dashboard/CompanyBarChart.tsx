@@ -12,6 +12,8 @@ import {
   OutlinedInput,
   Paper,
   Select,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
@@ -25,6 +27,10 @@ import {
   Tooltip,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+
+import CompanyBubbleChart, {
+  type CompanyHierarchyNode,
+} from './CompanyBubbleChart';
 
 ChartJS.register(
   CategoryScale,
@@ -50,7 +56,10 @@ type ChartResult = {
     label: string;
     count: number;
   }>;
+  hierarchy: CompanyHierarchyNode;
 };
+
+type ChartView = 'bar' | 'bubble';
 
 type FilterState = {
   level: string[];
@@ -87,16 +96,21 @@ function toOptionalNumber(value: string) {
 
 export default function CompanyBarChart() {
   const [dimension, setDimension] = useState<Dimension>('level');
+  const [chartView, setChartView] = useState<ChartView>('bar');
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
 
   const [levelOptions, setLevelOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
 
   const [result, setResult] = useState<ChartResult>({
     dimension: 'level',
     totalCompanies: 0,
     data: [],
+    hierarchy: {
+      name: 'Company hierarchy',
+      children: [],
+    },
   });
 
   const [loading, setLoading] = useState(true);
@@ -110,6 +124,8 @@ export default function CompanyBarChart() {
       if (!response.ok || !Array.isArray(companies)) {
         return;
       }
+
+      setCompanies(companies);
 
       setLevelOptions(
         Array.from(
@@ -131,19 +147,37 @@ export default function CompanyBarChart() {
         ).sort()
       );
 
-      setCityOptions(
-        Array.from(
-          new Set(
-            companies
-              .map((company) => company.city)
-              .filter((value): value is string => Boolean(value))
-          )
-        ).sort()
-      );
     } catch {
       // The chart request below will display the main connection error.
     }
   }, []);
+
+  const cityOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        companies
+          .filter((company) =>
+            company.country
+              ? filters.country.includes(company.country)
+              : false
+          )
+          .map((company) => company.city)
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort();
+  }, [companies, filters.country]);
+
+  useEffect(() => {
+    setFilters((current) => {
+      const city = current.city.filter((value) =>
+        cityOptions.includes(value)
+      );
+
+      return city.length === current.city.length
+        ? current
+        : { ...current, city };
+    });
+  }, [cityOptions]);
 
   const fetchChartData = useCallback(
     async (
@@ -383,6 +417,7 @@ export default function CompanyBarChart() {
 
           <Select
             multiple
+            disabled={filters.country.length === 0}
             value={filters.city}
             onChange={(event) => {
               const value = event.target.value;
@@ -495,6 +530,19 @@ export default function CompanyBarChart() {
         </Button>
       </Box>
 
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs
+          value={chartView}
+          onChange={(_event, value) =>
+            setChartView(value as ChartView)
+          }
+          aria-label="Company chart type"
+        >
+          <Tab value="bar" label="Bar Chart" />
+          <Tab value="bubble" label="Bubble Chart" />
+        </Tabs>
+      </Box>
+
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Matching companies: {result.totalCompanies}
       </Typography>
@@ -510,7 +558,7 @@ export default function CompanyBarChart() {
         >
           <CircularProgress />
         </Box>
-      ) : result.data.length === 0 ? (
+      ) : result.totalCompanies === 0 ? (
         <Box
           sx={{
             height: 240,
@@ -523,10 +571,12 @@ export default function CompanyBarChart() {
             No company data matches the selected filters
           </Typography>
         </Box>
-      ) : (
+      ) : chartView === 'bar' ? (
         <Box sx={{ height: 420 }}>
           <Bar data={chartData} options={chartOptions} />
         </Box>
+      ) : (
+        <CompanyBubbleChart data={result.hierarchy} />
       )}
     </Paper>
   );
