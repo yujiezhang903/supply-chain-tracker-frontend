@@ -17,6 +17,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import BusinessIcon from '@mui/icons-material/Business';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PeopleIcon from '@mui/icons-material/People';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
@@ -28,6 +29,7 @@ const navItems = [
   { label: 'Company', href: '/company', icon: <BusinessIcon /> },
   { label: 'Order', href: '/order', icon: <ShoppingCartIcon /> },
   { label: 'User', href: '/user', icon: <PeopleIcon /> },
+  { label: 'AI Agent', href: '/ai-agent', icon: <SmartToyIcon /> },
 ];
 
 export default function Sidebar({
