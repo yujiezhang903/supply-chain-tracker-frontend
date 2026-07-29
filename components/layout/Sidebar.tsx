@@ -18,6 +18,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PeopleIcon from '@mui/icons-material/People';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
@@ -30,6 +31,7 @@ const navItems = [
   { label: 'Order', href: '/order', icon: <ShoppingCartIcon /> },
   { label: 'User', href: '/user', icon: <PeopleIcon /> },
   { label: 'AI Agent', href: '/ai-agent', icon: <SmartToyIcon /> },
+  { label: 'Agent Tasks', href: '/agent-tasks', icon: <TaskAltIcon /> },
 ];
 
 export default function Sidebar({
@@ -58,7 +60,13 @@ export default function Sidebar({
     >
       <Toolbar />
 
-      <Box sx={{ display: 'flex', justifyContent: open ? 'flex-end' : 'center', px: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: open ? 'flex-end' : 'center',
+          px: 1,
+        }}
+      >
         <IconButton onClick={onToggle}>
           {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
         </IconButton>
@@ -66,7 +74,8 @@ export default function Sidebar({
 
       <List sx={{ px: 1 }}>
         {navItems.map((item) => {
-          const active = pathname === item.href;
+          const active =
+            pathname === item.href || pathname.startsWith(item.href + '/');
 
           return (
             <ListItemButton
