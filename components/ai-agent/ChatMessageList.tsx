@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 
 import MessageRenderer from './renderers/MessageRenderer';
 import type { ChatMessage } from './types';
@@ -65,6 +65,23 @@ export default function ChatMessageList({
                   backgroundColor: isUser ? '#e8f7f1' : 'background.paper',
                 }}
               >
+                {message.attachments?.length ? (
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{ flexWrap: 'wrap', mb: 1, rowGap: 0.75 }}
+                  >
+                    {message.attachments.map((attachment) => (
+                      <Chip
+                        key={attachment.id}
+                        label={attachment.name}
+                        size="small"
+                        variant="outlined"
+                      />
+                    ))}
+                  </Stack>
+                ) : null}
+
                 <MessageRenderer
                   message={message}
                   onConfirm={onConfirm}
