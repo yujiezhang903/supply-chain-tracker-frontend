@@ -4,32 +4,38 @@ import { ReactNode, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Box, CircularProgress } from '@mui/material';
 
-const protectedRoutes = ['/company', '/order', '/user'];
+import FloatingChatWidget from '@/components/ai-agent/FloatingChatWidget';
+
+const protectedRoutes = [
+  '/dashboard',
+  '/company',
+  '/order',
+  '/user',
+  '/ai-agent',
+  '/agent-tasks',
+];
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-
   const [checking, setChecking] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  const isProtectedRoute = protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route + '/'),
+  );
 
   useEffect(() => {
-    const isProtectedRoute = protectedRoutes.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
-    );
-
     const token = localStorage.getItem('accessToken');
+    setAuthenticated(Boolean(token));
 
     if (isProtectedRoute && !token) {
-      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+      router.replace('/login?redirect=' + encodeURIComponent(pathname));
       return;
     }
 
     setChecking(false);
-  }, [pathname, router]);
-
-  const isProtectedRoute = protectedRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  }, [isProtectedRoute, pathname, router]);
 
   if (checking && isProtectedRoute) {
     return (
@@ -46,5 +52,10 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {authenticated ? <FloatingChatWidget /> : null}
+    </>
+  );
 }
