@@ -464,10 +464,12 @@ export default function ChatWindow({
       onClose={onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{
-        sx: {
-          height: { xs: '100%', sm: 'min(760px, calc(100vh - 48px))' },
-          maxHeight: 'none',
+      slotProps={{
+        paper: {
+          sx: {
+            height: { xs: '100%', sm: 'min(760px, calc(100vh - 48px))' },
+            maxHeight: 'none',
+          },
         },
       }}
     >
