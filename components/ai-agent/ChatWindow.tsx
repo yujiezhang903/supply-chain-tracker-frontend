@@ -93,6 +93,12 @@ function providerFromStorage(): Provider {
     : 'mock';
 }
 
+function authorizationHeaders(): HeadersInit {
+  const token = localStorage.getItem('accessToken');
+
+  return token ? { Authorization: 'Bearer ' + token } : {};
+}
+
 function messageForFileOnlyRequest(files: File[]): string {
   if (files.length === 0) {
     return '';
@@ -123,7 +129,10 @@ export default function ChatWindow({
   const loadSession = useCallback(async (id: string) => {
     const response = await fetch(
       API_URL + '/ai-agent/sessions/' + encodeURIComponent(id),
-      { cache: 'no-store' },
+      {
+        cache: 'no-store',
+        headers: authorizationHeaders(),
+      },
     );
     const payload = await readResponse(response);
 
@@ -265,6 +274,7 @@ export default function ChatWindow({
 
       const response = await fetch(API_URL + '/ai-agent/chat', {
         method: 'POST',
+        headers: authorizationHeaders(),
         body: formData,
       });
       const payload = await readResponse(response);
