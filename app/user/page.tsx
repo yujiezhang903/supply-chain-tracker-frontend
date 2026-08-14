@@ -19,7 +19,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 
 import { apiUrl } from '@/lib/api';
 
@@ -347,12 +347,9 @@ export default function UserPage() {
             columns={columns}
             checkboxSelection
             disableRowSelectionOnClick
-            onRowSelectionModelChange={(newSelection: any) => {
-              if (Array.isArray(newSelection)) {
-                setSelectedIds(newSelection.map(String));
-              } else if (newSelection?.ids) {
-                setSelectedIds(Array.from(newSelection.ids).map(String));
-              }
+            disableRowSelectionExcludeModel
+            onRowSelectionModelChange={(newSelection) => {
+              setSelectedIds(Array.from(newSelection.ids, String));
             }}
             pageSizeOptions={[5, 10, 20]}
             initialState={{
@@ -431,4 +428,5 @@ export default function UserPage() {
     </DashboardLayout>
   );
 }
+
 

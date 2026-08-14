@@ -22,6 +22,7 @@ import {
 
 import {
   Chart as ChartJS,
+  type ChartOptions,
   ArcElement,
   CategoryScale,
   LinearScale,
@@ -224,16 +225,16 @@ export default function DashboardPage() {
     ],
   };
 
-  const doughnutOptions = {
+  const doughnutOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom' as const,
+        position: 'bottom',
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context) => {
             const item = levelDistribution[context.dataIndex];
 
             return `${item.level}: ${item.count} companies (${item.percentage.toFixed(
@@ -261,20 +262,20 @@ export default function DashboardPage() {
     ],
   };
 
-  const lineOptions = {
+  const lineOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
-      mode: 'index' as const,
+      mode: 'index',
       intersect: false,
     },
     plugins: {
       legend: {
-        position: 'bottom' as const,
+        position: 'bottom',
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context) => {
             return `Total companies: ${context.parsed.y}`;
           },
         },
@@ -429,4 +430,5 @@ export default function DashboardPage() {
     </DashboardLayout>
   );
 }
+
 

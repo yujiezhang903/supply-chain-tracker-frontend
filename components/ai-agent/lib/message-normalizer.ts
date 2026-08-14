@@ -233,6 +233,7 @@ function normalizeReport(
 ): ChatMessage {
   const rawStatus = asString(content.status);
   const status =
+    rawStatus === 'draft' ||
     rawStatus === 'generating' ||
     rawStatus === 'failed'
       ? rawStatus
@@ -362,4 +363,3 @@ export function attachmentsFromFiles(
     size: file.size,
   }));
 }
-
