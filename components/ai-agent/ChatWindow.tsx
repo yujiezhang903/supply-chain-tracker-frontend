@@ -22,6 +22,7 @@ import ChatInput from './ChatInput';
 import ChatMessageList from './ChatMessageList';
 import {
   attachmentsFromFiles,
+  normalizeChatMessage,
   normalizeChatMessages,
 } from './lib/message-normalizer';
 import { createTextMessage } from './lib/chat-session';
@@ -129,12 +130,13 @@ export default function ChatWindow({
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const loadSession = useCallback(async (id: string) => {
+  const loadSession = useCallback(async (id: string, signal: AbortSignal) => {
     const response = await fetch(
       apiUrl('/ai-agent/sessions/' + encodeURIComponent(id)),
       {
         cache: 'no-store',
         headers: authorizationHeaders(),
+        signal,
       },
     );
     const payload = await readResponse(response);
@@ -149,6 +151,10 @@ export default function ChatWindow({
     const storedMessages = Array.isArray(record.messages)
       ? normalizeChatMessages(record.messages)
       : [];
+
+    if (signal.aborted) {
+      return;
+    }
 
     setSessionId(id);
     setMessages(
@@ -189,11 +195,16 @@ export default function ChatWindow({
       return;
     }
 
+    const controller = new AbortController();
     setLoadingHistory(true);
     setError('');
 
-    void loadSession(storedSessionId)
+    void loadSession(storedSessionId, controller.signal)
       .catch((loadError) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         localStorage.removeItem('ai-agent-session-id');
         setSessionId(null);
         setError(
@@ -202,7 +213,13 @@ export default function ChatWindow({
             : 'Unable to restore the conversation.',
         );
       })
-      .finally(() => setLoadingHistory(false));
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingHistory(false);
+        }
+      });
+
+    return () => controller.abort();
   }, [loadSession, visible]);
 
   useEffect(() => {
@@ -210,7 +227,7 @@ export default function ChatWindow({
   }, [messages, loadingHistory]);
 
   const startNewConversation = () => {
-    if (sending) {
+    if (sending || loadingHistory) {
       return;
     }
 
@@ -303,20 +320,23 @@ export default function ChatWindow({
         throw new Error('The backend did not return a session ID.');
       }
 
-      // Prefer the complete persisted session. The assistantMessage fallback
-      // keeps the UI compatible with older backend response envelopes.
-      const returnedMessages = Array.isArray(session.messages)
-        ? normalizeChatMessages(session.messages)
-        : record.assistantMessage
-          ? [
-              userMessage,
-              normalizeChatMessages([record.assistantMessage])[0],
-            ]
-          : [userMessage];
-
       setSessionId(nextSessionId);
       localStorage.setItem('ai-agent-session-id', nextSessionId);
-      setMessages(returnedMessages);
+
+      // Prefer the complete persisted session. Older response envelopes only
+      // contain assistantMessage, so append it to the optimistic conversation
+      // instead of replacing and losing all earlier messages.
+      if (Array.isArray(session.messages)) {
+        setMessages(normalizeChatMessages(session.messages));
+      } else if (
+        record.assistantMessage !== null &&
+        record.assistantMessage !== undefined
+      ) {
+        setMessages((current) => [
+          ...current,
+          normalizeChatMessage(record.assistantMessage, current.length),
+        ]);
+      }
     } catch (sendError) {
       const message =
         sendError instanceof Error
@@ -379,7 +399,7 @@ export default function ChatWindow({
       <IconButton
         size="small"
         onClick={startNewConversation}
-        disabled={sending}
+        disabled={sending || loadingHistory}
         aria-label="New conversation"
         title="New conversation"
       >
@@ -505,4 +525,3 @@ export default function ChatWindow({
     </Dialog>
   );
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -22,6 +22,7 @@ import {
   BarElement,
   CategoryScale,
   Chart as ChartJS,
+  type ChartOptions,
   Legend,
   LinearScale,
   Tooltip,
@@ -120,6 +121,7 @@ export default function CompanyBarChart() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const chartRequestIdRef = useRef(0);
 
   const loadFilterOptions = useCallback(async () => {
     try {
@@ -189,6 +191,7 @@ export default function CompanyBarChart() {
       selectedDimension: Dimension = dimension,
       selectedFilters: FilterState = filters
     ) => {
+      const requestId = ++chartRequestIdRef.current;
       setLoading(true);
       setError('');
 
@@ -228,15 +231,26 @@ export default function CompanyBarChart() {
         const data = await response.json();
 
         if (!response.ok) {
-          setError(data.message || 'Cannot load bar chart data');
+          if (requestId === chartRequestIdRef.current) {
+            setError(data.message || 'Cannot load bar chart data');
+          }
+
           return;
         }
 
-        setResult(data);
+        if (requestId === chartRequestIdRef.current) {
+          setResult(data);
+        }
       } catch {
-        setError('Cannot connect to backend server');
+        if (requestId === chartRequestIdRef.current) {
+          setError('Cannot connect to backend server');
+        }
       } finally {
-        setLoading(false);
+        // A slower previous request must not clear the loading state or
+        // overwrite feedback for the user's latest filter selection.
+        if (requestId === chartRequestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
     [dimension, filters]
@@ -271,55 +285,58 @@ export default function CompanyBarChart() {
     [result]
   );
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
+  const chartOptions = useMemo<ChartOptions<'bar'>>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
       },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            const count = Number(context.parsed.y);
-            const percentage =
-              result.totalCompanies > 0
-                ? (count / result.totalCompanies) * 100
-                : 0;
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const count = Number(context.parsed.y);
+              const percentage =
+                result.totalCompanies > 0
+                  ? (count / result.totalCompanies) * 100
+                  : 0;
 
-            return `${count} companies (${percentage.toFixed(1)}%)`;
+              return `${count} companies (${percentage.toFixed(1)}%)`;
+            },
           },
         },
       },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          precision: 0,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0,
+          },
+          title: {
+            display: true,
+            text: 'Number of Companies',
+          },
         },
-        title: {
-          display: true,
-          text: 'Number of Companies',
+        x: {
+          title: {
+            display: true,
+            text:
+              dimension === 'level'
+                ? 'Company Level'
+                : dimension === 'country'
+                  ? 'Country'
+                  : 'City',
+          },
         },
       },
-      x: {
-        title: {
-          display: true,
-          text:
-            dimension === 'level'
-              ? 'Company Level'
-              : dimension === 'country'
-                ? 'Country'
-                : 'City',
-        },
-      },
-    },
-  };
+    }),
+    [dimension, result.totalCompanies]
+  );
 
   return (
     <Paper sx={{ p: 3, mt: 3 }}>
@@ -586,4 +603,3 @@ export default function CompanyBarChart() {
     </Paper>
   );
 }
-
