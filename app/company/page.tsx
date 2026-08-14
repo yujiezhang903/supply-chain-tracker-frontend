@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { apiUrl } from '@/lib/api';
 import {
   Alert,
   Box,
@@ -178,7 +179,7 @@ export default function CompanyPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/companies');
+      const res = await fetch(apiUrl('/companies'));
       const data = await res.json();
 
       if (!res.ok) {
@@ -297,3 +298,4 @@ export default function CompanyPage() {
     </DashboardLayout>
   );
 }
+

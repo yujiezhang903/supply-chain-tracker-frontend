@@ -13,6 +13,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { apiUrl } from '@/lib/api';
+
 type Order = {
   id: string;
   companyId: string;
@@ -31,7 +33,7 @@ export default function OrderPage() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://localhost:3001/orders');
+      const res = await fetch(apiUrl('/orders'));
       const data = await res.json();
       setOrders(data);
     } catch {
@@ -41,7 +43,7 @@ export default function OrderPage() {
 
   const handleCreate = async () => {
     try {
-      const res = await fetch('http://localhost:3001/orders', {
+      const res = await fetch(apiUrl('/orders'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,3 +166,4 @@ export default function OrderPage() {
     </Container>
   );
 }
+

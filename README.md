@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Supply Chain Tracker Frontend
 
-## Getting Started
+Next.js dashboard for managing supply-chain companies, relationships, orders,
+users and AI-assisted analysis.
 
-First, run the development server:
+The API is maintained in
+[supply-chain-tracker-backend](https://github.com/yujiezhang903/supply-chain-tracker-backend).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Main pages
+
+| Route | Purpose |
+| --- | --- |
+| `/login` and `/signup` | Authentication |
+| `/dashboard` | Supply-chain metrics and visual analysis |
+| `/company` | Searchable, filterable company table |
+| `/order` | Order management |
+| `/user` | User management |
+| `/ai-agent` | Persistent AI Agent conversation |
+| `/agent-tasks` | Task-interface preview for a later orchestration milestone |
+
+Authenticated dashboard pages use the shared layout in
+`components/layout/DashboardLayout.tsx`. AI rendering and session behavior are
+documented in [components/ai-agent/README.md](components/ai-agent/README.md).
+
+## Technology
+
+- Node.js 22+
+- Next.js 16.2.7 and React 19
+- Material UI 9
+- Chart.js and D3
+- TypeScript and ESLint
+
+## Local setup
+
+1. Install dependencies.
+
+   ```bash
+   npm install
+   ```
+
+2. Create a local environment file.
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Start the backend on port 3001, or change `NEXT_PUBLIC_API_URL` to the
+   correct API origin.
+
+4. Start the frontend.
+
+   ```bash
+   npm run dev
+   ```
+
+Open `http://localhost:3000`.
+
+## Configuration
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+All frontend requests build their URL through `lib/api.ts`. Keep the value as
+an origin without a route suffix. A trailing slash is accepted and normalized.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Useful commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server with webpack |
+| `npm run build` | Create a production build |
+| `npm run start` | Start a production build |
+| `npm run lint` | Run ESLint |
 
-## Learn More
+## AI Agent behavior
 
-To learn more about Next.js, take a look at the following resources:
+The AI window is available as a full page and as a floating dialog on
+authenticated pages. It:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- restores the last backend session when opened;
+- stores the selected model provider and session ID in browser storage;
+- sends text and up to five attached files as multipart form data;
+- normalizes API messages into text, table, chart, report or confirmation
+  renderers;
+- treats the backend session response as the authoritative message history.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The `Agent Tasks` page is currently a visual preview. It does not yet execute
+LangGraph tasks.
 
-## Deploy on Vercel
+## Validation before delivery
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run lint
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Also verify login, the company/dashboard pages, a restored AI conversation and
+a file-only AI message against a running backend.
+
+## Repository hygiene
+
+Generated output, dependencies, local environment files and temporary backup
+copies are ignored. Use Git history instead of committing `.before-*`,
+`.backup` or `.bak` files.
+

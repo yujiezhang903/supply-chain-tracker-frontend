@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CompanyBarChart from '@/components/dashboard/CompanyBarChart';
+import { apiUrl } from '@/lib/api';
 import {
   Alert,
   Box,
@@ -180,7 +181,7 @@ export default function DashboardPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/companies');
+      const res = await fetch(apiUrl('/companies'));
       const data = await res.json();
 
       if (!res.ok) {
@@ -428,3 +429,4 @@ export default function DashboardPage() {
     </DashboardLayout>
   );
 }
+

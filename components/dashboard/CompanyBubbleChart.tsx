@@ -55,6 +55,10 @@ function formatMoney(value?: number | null) {
   }).format(value);
 }
 
+/**
+ * Render a zoomable packed hierarchy. Leaf radius represents employee count;
+ * parent circles are layout containers and must not add a second weight.
+ */
 export default function CompanyBubbleChart({ data }: Props) {
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +108,7 @@ export default function CompanyBubbleChart({ data }: Props) {
 
       svg.selectAll("*").remove();
 
+      // Only leaf nodes contribute weight; D3 derives parent totals once.
       const hierarchy = d3
         .hierarchy<CompanyHierarchyNode>(data)
         .sum((node) => {
@@ -213,6 +218,7 @@ export default function CompanyBubbleChart({ data }: Props) {
           return name.length > 18 ? `${name.slice(0, 16)}…` : name;
         });
 
+      // D3 represents a zoom view as [centerX, centerY, diameter].
       const zoomTo = (nextView: readonly number[]) => {
         const [x, y, diameter] = nextView;
         const scale = chartDiameter / diameter;
@@ -297,6 +303,7 @@ export default function CompanyBubbleChart({ data }: Props) {
 
     drawChart();
 
+    // Repack from the source hierarchy when the responsive container changes.
     const resizeObserver = new ResizeObserver(() => {
       drawChart();
     });
@@ -418,3 +425,4 @@ export default function CompanyBubbleChart({ data }: Props) {
     </Box>
   );
 }
+

@@ -31,6 +31,7 @@ import { Bar } from 'react-chartjs-2';
 import CompanyBubbleChart, {
   type CompanyHierarchyNode,
 } from './CompanyBubbleChart';
+import { apiUrl } from '@/lib/api';
 
 ChartJS.register(
   CategoryScale,
@@ -94,6 +95,10 @@ function toOptionalNumber(value: string) {
   return Number.isFinite(number) ? number : undefined;
 }
 
+/**
+ * Own linked company filters and switch between aggregate and hierarchy views.
+ * Draft filters are submitted explicitly to avoid a request on every keystroke.
+ */
 export default function CompanyBarChart() {
   const [dimension, setDimension] = useState<Dimension>('level');
   const [chartView, setChartView] = useState<ChartView>('bar');
@@ -118,7 +123,7 @@ export default function CompanyBarChart() {
 
   const loadFilterOptions = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/companies');
+      const response = await fetch(apiUrl('/companies'));
       const companies: Company[] = await response.json();
 
       if (!response.ok || !Array.isArray(companies)) {
@@ -210,7 +215,7 @@ export default function CompanyBarChart() {
 
       try {
         const response = await fetch(
-          'http://localhost:3001/dashboard/companies/filter',
+          apiUrl('/dashboard/companies/filter'),
           {
             method: 'POST',
             headers: {
@@ -581,3 +586,4 @@ export default function CompanyBarChart() {
     </Paper>
   );
 }
+

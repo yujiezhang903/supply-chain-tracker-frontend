@@ -21,6 +21,8 @@ import {
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 
+import { apiUrl } from '@/lib/api';
+
 type User = {
   id: string;
   name: string | null;
@@ -56,7 +58,7 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/users');
+      const res = await fetch(apiUrl('/users'));
       const data = await res.json();
 
       if (!res.ok) {
@@ -131,8 +133,8 @@ export default function UserPage() {
 
     try {
       const url = editingUser
-        ? `http://localhost:3001/users/${editingUser.id}`
-        : 'http://localhost:3001/users';
+        ? apiUrl('/users/' + editingUser.id)
+        : apiUrl('/users');
 
       const method = editingUser ? 'PATCH' : 'POST';
 
@@ -173,7 +175,7 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch(`http://localhost:3001/users/${id}`, {
+      const res = await fetch(apiUrl('/users/' + id), {
         method: 'DELETE',
       });
 
@@ -196,7 +198,7 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/users/bulk', {
+      const res = await fetch(apiUrl('/users/bulk'), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -429,3 +431,4 @@ export default function UserPage() {
     </DashboardLayout>
   );
 }
+

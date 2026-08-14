@@ -11,6 +11,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { apiUrl } from '@/lib/api';
+
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
@@ -42,7 +44,7 @@ export default function LoginPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:3001/auth/login', {
+      const res = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -21,14 +20,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import ChatInput from './ChatInput';
 import ChatMessageList from './ChatMessageList';
-import { attachmentsFromFiles, normalizeChatMessages } from './lib/message-normalizer';
+import {
+  attachmentsFromFiles,
+  normalizeChatMessages,
+} from './lib/message-normalizer';
 import { createTextMessage } from './lib/chat-session';
 import type { ChatMessage } from './types';
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  'http://localhost:3001';
+import { apiUrl } from '@/lib/api';
 
 const PROVIDERS = [
   { value: 'mock', label: 'Local mock' },
@@ -107,6 +105,11 @@ function messageForFileOnlyRequest(files: File[]): string {
   return 'Please analyse the attached file' + (files.length > 1 ? 's' : '') + '.';
 }
 
+/**
+ * Shared AI conversation surface for both the full page and floating dialog.
+ * The backend session is authoritative; browser storage keeps only the latest
+ * session ID and selected provider.
+ */
 export default function ChatWindow({
   embedded = false,
   open = false,
@@ -128,7 +131,7 @@ export default function ChatWindow({
 
   const loadSession = useCallback(async (id: string) => {
     const response = await fetch(
-      API_URL + '/ai-agent/sessions/' + encodeURIComponent(id),
+      apiUrl('/ai-agent/sessions/' + encodeURIComponent(id)),
       {
         cache: 'no-store',
         headers: authorizationHeaders(),
@@ -178,6 +181,8 @@ export default function ChatWindow({
     const storedProvider = providerFromStorage();
     setProvider(storedProvider);
 
+    // The floating widget stays mounted while hidden. Restore history only
+    // after it becomes visible so closed widgets do not issue background calls.
     const storedSessionId = localStorage.getItem('ai-agent-session-id');
 
     if (!storedSessionId) {
@@ -272,7 +277,7 @@ export default function ChatWindow({
 
       files.forEach((file) => formData.append('files', file));
 
-      const response = await fetch(API_URL + '/ai-agent/chat', {
+      const response = await fetch(apiUrl('/ai-agent/chat'), {
         method: 'POST',
         headers: authorizationHeaders(),
         body: formData,
@@ -298,6 +303,8 @@ export default function ChatWindow({
         throw new Error('The backend did not return a session ID.');
       }
 
+      // Prefer the complete persisted session. The assistantMessage fallback
+      // keeps the UI compatible with older backend response envelopes.
       const returnedMessages = Array.isArray(session.messages)
         ? normalizeChatMessages(session.messages)
         : record.assistantMessage
@@ -498,3 +505,4 @@ export default function ChatWindow({
     </Dialog>
   );
 }
+

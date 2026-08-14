@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -14,12 +13,15 @@ import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import { useRef, useState } from 'react';
 
+const MAX_ATTACHMENTS = 5;
+
 interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   onSend: (value: string, files: File[]) => void;
 }
 
+/** Collect text and files locally, then hand one immutable payload to ChatWindow. */
 export default function ChatInput({
   disabled = false,
   placeholder = 'Ask the AI Agent something...',
@@ -45,7 +47,7 @@ export default function ChatInput({
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const selected = Array.from(event.target.files ?? []);
-    setFiles((current) => [...current, ...selected].slice(0, 5));
+    setFiles((current) => [...current, ...selected].slice(0, MAX_ATTACHMENTS));
     event.target.value = '';
   };
 
@@ -86,7 +88,7 @@ export default function ChatInput({
         <Tooltip title="Attach files">
           <IconButton
             component="label"
-            disabled={disabled || files.length >= 5}
+            disabled={disabled || files.length >= MAX_ATTACHMENTS}
             size="small"
             sx={{ mb: 1 }}
           >
@@ -138,3 +140,4 @@ export default function ChatInput({
     </Stack>
   );
 }
+
