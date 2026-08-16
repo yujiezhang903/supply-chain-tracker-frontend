@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Container, TextField, Typography } from '@mui/material';
 
+import { apiUrl } from '@/lib/api';
+
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupPage() {
@@ -37,7 +39,7 @@ export default function SignupPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:3001/auth/signup', {
+      const res = await fetch(apiUrl('/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -93,3 +95,4 @@ export default function SignupPage() {
     </Container>
   );
 }
+

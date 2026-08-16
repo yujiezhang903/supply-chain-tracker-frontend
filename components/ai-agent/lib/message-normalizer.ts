@@ -1,4 +1,3 @@
-
 import type {
   ChatAttachment,
   ChatMessage,
@@ -153,6 +152,8 @@ function normalizeChart(
     ? content.datasets
     : [];
 
+  // Current backend charts use Chart.js-style labels/datasets. The branch
+  // below also accepts the earlier row-oriented data/xKey/yKeys shape.
   if (rawDatasets.length > 0) {
     const datasetNames = rawDatasets.map((item, datasetIndex) => {
       const dataset = asRecord(item);
@@ -232,6 +233,7 @@ function normalizeReport(
 ): ChatMessage {
   const rawStatus = asString(content.status);
   const status =
+    rawStatus === 'draft' ||
     rawStatus === 'generating' ||
     rawStatus === 'failed'
       ? rawStatus
@@ -298,6 +300,10 @@ function normalizeConfirmation(
   };
 }
 
+/**
+ * Convert untrusted API JSON into the UI's discriminated message union.
+ * Unsupported or incomplete payloads fail safely to a text message.
+ */
 export function normalizeChatMessage(
   value: unknown,
   index = 0,
@@ -346,6 +352,7 @@ export function normalizeChatMessages(
   );
 }
 
+/** Build optimistic attachment metadata; File bytes stay in FormData. */
 export function attachmentsFromFiles(
   files: File[],
 ): ChatAttachment[] {

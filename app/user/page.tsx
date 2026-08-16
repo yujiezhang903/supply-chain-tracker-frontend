@@ -19,7 +19,9 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+
+import { apiUrl } from '@/lib/api';
 
 type User = {
   id: string;
@@ -33,6 +35,17 @@ type User = {
 
 const roleOptions = ['Admin', 'Manager', 'Operator', 'Viewer'];
 const statusOptions = ['Active', 'Pending', 'Disabled'];
+
+async function requestUsers(signal?: AbortSignal): Promise<User[]> {
+  const response = await fetch(apiUrl('/users'), { signal });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Cannot load users');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
 
 export default function UserPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -56,22 +69,38 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/users');
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Cannot load users');
-        return;
-      }
-
-      setUsers(Array.isArray(data) ? data : []);
-    } catch {
-      setError('Cannot connect to backend server');
+      setUsers(await requestUsers());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Cannot connect to backend server',
+      );
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    const controller = new AbortController();
+
+    void requestUsers(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setUsers(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Cannot connect to backend server',
+        );
+      });
+
+    return () => controller.abort();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -131,8 +160,8 @@ export default function UserPage() {
 
     try {
       const url = editingUser
-        ? `http://localhost:3001/users/${editingUser.id}`
-        : 'http://localhost:3001/users';
+        ? apiUrl('/users/' + editingUser.id)
+        : apiUrl('/users');
 
       const method = editingUser ? 'PATCH' : 'POST';
 
@@ -163,7 +192,7 @@ export default function UserPage() {
       }
 
       setDialogOpen(false);
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -173,7 +202,7 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch(`http://localhost:3001/users/${id}`, {
+      const res = await fetch(apiUrl('/users/' + id), {
         method: 'DELETE',
       });
 
@@ -184,7 +213,7 @@ export default function UserPage() {
         return;
       }
 
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -196,7 +225,7 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3001/users/bulk', {
+      const res = await fetch(apiUrl('/users/bulk'), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -212,7 +241,7 @@ export default function UserPage() {
       }
 
       setSelectedIds([]);
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -345,12 +374,9 @@ export default function UserPage() {
             columns={columns}
             checkboxSelection
             disableRowSelectionOnClick
-            onRowSelectionModelChange={(newSelection: any) => {
-              if (Array.isArray(newSelection)) {
-                setSelectedIds(newSelection.map(String));
-              } else if (newSelection?.ids) {
-                setSelectedIds(Array.from(newSelection.ids).map(String));
-              }
+            disableRowSelectionExcludeModel
+            onRowSelectionModelChange={(newSelection) => {
+              setSelectedIds(Array.from(newSelection.ids, String));
             }}
             pageSizeOptions={[5, 10, 20]}
             initialState={{
@@ -429,3 +455,4 @@ export default function UserPage() {
     </DashboardLayout>
   );
 }
+

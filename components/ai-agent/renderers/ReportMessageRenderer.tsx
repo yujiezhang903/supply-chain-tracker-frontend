@@ -33,6 +33,10 @@ export default function ReportMessageRenderer({
           </Typography>
         </Box>
 
+        {status === 'draft' && (
+          <Alert severity="info">This report is still a draft.</Alert>
+        )}
+
         {status === 'generating' && (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <CircularProgress size={18} />

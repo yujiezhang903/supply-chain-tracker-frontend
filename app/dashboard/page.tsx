@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CompanyBarChart from '@/components/dashboard/CompanyBarChart';
+import { apiUrl } from '@/lib/api';
 import {
   Alert,
   Box,
@@ -21,6 +22,7 @@ import {
 
 import {
   Chart as ChartJS,
+  type ChartOptions,
   ArcElement,
   CategoryScale,
   LinearScale,
@@ -175,29 +177,42 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchCompanies = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await fetch('http://localhost:3001/companies');
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Cannot load dashboard data');
-        return;
-      }
-
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch {
-      setError('Cannot connect to backend server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchCompanies();
+    const controller = new AbortController();
+
+    void fetch(apiUrl('/companies'), { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Cannot load dashboard data');
+        }
+
+        return Array.isArray(data) ? data : [];
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCompanies(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Cannot connect to backend server',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
   }, []);
 
   const cards = useMemo(() => {
@@ -223,16 +238,16 @@ export default function DashboardPage() {
     ],
   };
 
-  const doughnutOptions = {
+  const doughnutOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom' as const,
+        position: 'bottom',
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context) => {
             const item = levelDistribution[context.dataIndex];
 
             return `${item.level}: ${item.count} companies (${item.percentage.toFixed(
@@ -260,20 +275,20 @@ export default function DashboardPage() {
     ],
   };
 
-  const lineOptions = {
+  const lineOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
-      mode: 'index' as const,
+      mode: 'index',
       intersect: false,
     },
     plugins: {
       legend: {
-        position: 'bottom' as const,
+        position: 'bottom',
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context) => {
             return `Total companies: ${context.parsed.y}`;
           },
         },
@@ -428,3 +443,4 @@ export default function DashboardPage() {
     </DashboardLayout>
   );
 }
+

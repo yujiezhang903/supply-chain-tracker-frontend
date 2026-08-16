@@ -2,25 +2,19 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatRole,
-  ChatSession,
 } from '../types';
 
-function createId(prefix: 'session' | 'message'): string {
+function createMessageId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return prefix + '-' + crypto.randomUUID();
+    return 'message-' + crypto.randomUUID();
   }
 
   return (
-    prefix +
-    '-' +
+    'message-' +
     Date.now() +
     '-' +
     Math.random().toString(36).slice(2)
   );
-}
-
-export function createMessageId(): string {
-  return createId('message');
 }
 
 export function createTextMessage(
@@ -43,20 +37,3 @@ export function createTextMessage(
   return message;
 }
 
-export function createInitialSession(): ChatSession {
-  const now = new Date().toISOString();
-
-  return {
-    id: createId('session'),
-    title: 'New conversation',
-    status: 'active',
-    messages: [
-      createTextMessage(
-        'assistant',
-        'Hello! How can I help with your supply-chain work today?',
-      ),
-    ],
-    createdAt: now,
-    updatedAt: now,
-  };
-}

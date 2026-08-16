@@ -40,7 +40,7 @@ export interface ChartMessageContent {
 export interface ReportMessageContent {
   title: string;
   summary: string;
-  status?: 'generating' | 'ready' | 'failed';
+  status?: 'draft' | 'generating' | 'ready' | 'failed';
   fileName?: string;
   downloadUrl?: string;
 }
