@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AppBar,
@@ -10,28 +9,24 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import {
+  setBrowserStorage,
+  useBrowserStorage,
+} from '@/lib/browser-storage';
 
 export default function Header() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const email = localStorage.getItem('userEmail');
-
-    if (token && email) {
-      setUserEmail(email);
-    }
-  }, []);
+  const accessToken = useBrowserStorage('accessToken');
+  const storedEmail = useBrowserStorage('userEmail');
+  const userEmail = accessToken ? storedEmail : null;
 
   const handleLogin = () => {
     router.push('/login');
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('userEmail');
-    setUserEmail(null);
+    setBrowserStorage('accessToken', null);
+    setBrowserStorage('userEmail', null);
     router.push('/dashboard');
   };
 

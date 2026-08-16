@@ -175,26 +175,37 @@ export default function CompanyPage() {
   const [levelFilter, setLevelFilter] = useState<string[]>([]);
   const [error, setError] = useState('');
 
-  const fetchCompanies = async () => {
-    setError('');
-
-    try {
-      const res = await fetch(apiUrl('/companies'));
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Cannot load companies');
-        return;
-      }
-
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch {
-      setError('Cannot connect to backend server');
-    }
-  };
-
   useEffect(() => {
-    fetchCompanies();
+    const controller = new AbortController();
+
+    void fetch(apiUrl('/companies'), { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Cannot load companies');
+        }
+
+        return Array.isArray(data) ? data : [];
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCompanies(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Cannot connect to backend server',
+        );
+      });
+
+    return () => controller.abort();
   }, []);
 
   const levelOptions = useMemo(() => {
@@ -298,4 +309,3 @@ export default function CompanyPage() {
     </DashboardLayout>
   );
 }
-

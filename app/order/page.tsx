@@ -23,6 +23,17 @@ type Order = {
   status: string;
 };
 
+async function requestOrders(signal?: AbortSignal): Promise<Order[]> {
+  const response = await fetch(apiUrl('/orders'), { signal });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Cannot load orders');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
 export default function OrderPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [companyId, setCompanyId] = useState('');
@@ -33,11 +44,11 @@ export default function OrderPage() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch(apiUrl('/orders'));
-      const data = await res.json();
-      setOrders(data);
-    } catch {
-      setError('Cannot load orders');
+      setOrders(await requestOrders());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : 'Cannot load orders',
+      );
     }
   };
 
@@ -68,14 +79,32 @@ export default function OrderPage() {
       setQuantity('');
       setStatus('Pending');
 
-      fetchOrders();
+      void fetchOrders();
     } catch {
       setError('Cannot connect to backend server');
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+
+    void requestOrders(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setOrders(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error ? loadError.message : 'Cannot load orders',
+        );
+      });
+
+    return () => controller.abort();
   }, []);
 
   return (
@@ -166,4 +195,3 @@ export default function OrderPage() {
     </Container>
   );
 }
-

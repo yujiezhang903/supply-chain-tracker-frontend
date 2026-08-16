@@ -1,10 +1,11 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Box, CircularProgress } from '@mui/material';
 
 import FloatingChatWidget from '@/components/ai-agent/FloatingChatWidget';
+import { useBrowserStorage, useHydrated } from '@/lib/browser-storage';
 
 const protectedRoutes = [
   '/dashboard',
@@ -18,26 +19,20 @@ const protectedRoutes = [
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [checking, setChecking] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const hydrated = useHydrated();
+  const accessToken = useBrowserStorage('accessToken');
 
   const isProtectedRoute = protectedRoutes.some(
     (route) => pathname === route || pathname.startsWith(route + '/'),
   );
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    setAuthenticated(Boolean(token));
-
-    if (isProtectedRoute && !token) {
+    if (hydrated && isProtectedRoute && !accessToken) {
       router.replace('/login?redirect=' + encodeURIComponent(pathname));
-      return;
     }
+  }, [accessToken, hydrated, isProtectedRoute, pathname, router]);
 
-    setChecking(false);
-  }, [isProtectedRoute, pathname, router]);
-
-  if (checking && isProtectedRoute) {
+  if (isProtectedRoute && (!hydrated || !accessToken)) {
     return (
       <Box
         sx={{
@@ -55,7 +50,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      {authenticated ? <FloatingChatWidget /> : null}
+      {hydrated && accessToken ? <FloatingChatWidget /> : null}
     </>
   );
 }

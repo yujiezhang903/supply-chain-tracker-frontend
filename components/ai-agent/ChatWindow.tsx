@@ -28,6 +28,10 @@ import {
 import { createTextMessage } from './lib/chat-session';
 import type { ChatMessage } from './types';
 import { apiUrl } from '@/lib/api';
+import {
+  setBrowserStorage,
+  useBrowserStorage,
+} from '@/lib/browser-storage';
 
 const PROVIDERS = [
   { value: 'mock', label: 'Local mock' },
@@ -80,15 +84,9 @@ function getErrorMessage(value: unknown, fallback: string): string {
     : fallback;
 }
 
-function providerFromStorage(): Provider {
-  if (typeof window === 'undefined') {
-    return 'mock';
-  }
-
-  const stored = localStorage.getItem('ai-agent-provider');
-
-  return PROVIDERS.some((provider) => provider.value === stored)
-    ? (stored as Provider)
+function normalizeProvider(value: string | null): Provider {
+  return PROVIDERS.some((provider) => provider.value === value)
+    ? (value as Provider)
     : 'mock';
 }
 
@@ -117,13 +115,14 @@ export default function ChatWindow({
   onClose,
 }: ChatWindowProps) {
   const visible = embedded || open;
+  const storedProvider = useBrowserStorage('ai-agent-provider');
+  const provider = normalizeProvider(storedProvider);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     createTextMessage(
       'assistant',
       'Hello! I can help with your supply-chain data. Ask a question or attach a file to get started.',
     ),
   ]);
-  const [provider, setProvider] = useState<Provider>('mock');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sending, setSending] = useState(false);
@@ -174,8 +173,7 @@ export default function ChatWindow({
       record.provider === 'qwen' ||
       record.provider === 'openai'
     ) {
-      setProvider(record.provider);
-      localStorage.setItem('ai-agent-provider', record.provider);
+      setBrowserStorage('ai-agent-provider', record.provider);
     }
   }, []);
 
@@ -183,9 +181,6 @@ export default function ChatWindow({
     if (!visible) {
       return;
     }
-
-    const storedProvider = providerFromStorage();
-    setProvider(storedProvider);
 
     // The floating widget stays mounted while hidden. Restore history only
     // after it becomes visible so closed widgets do not issue background calls.
@@ -196,10 +191,17 @@ export default function ChatWindow({
     }
 
     const controller = new AbortController();
-    setLoadingHistory(true);
-    setError('');
 
-    void loadSession(storedSessionId, controller.signal)
+    void Promise.resolve()
+      .then(() => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLoadingHistory(true);
+        setError('');
+        return loadSession(storedSessionId, controller.signal);
+      })
       .catch((loadError) => {
         if (controller.signal.aborted) {
           return;
@@ -383,8 +385,7 @@ export default function ChatWindow({
         disabled={sending || loadingHistory}
         onChange={(event) => {
           const nextProvider = event.target.value as Provider;
-          setProvider(nextProvider);
-          localStorage.setItem('ai-agent-provider', nextProvider);
+          setBrowserStorage('ai-agent-provider', nextProvider);
         }}
         sx={{ minWidth: 132 }}
         aria-label="AI model"

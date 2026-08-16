@@ -36,6 +36,17 @@ type User = {
 const roleOptions = ['Admin', 'Manager', 'Operator', 'Viewer'];
 const statusOptions = ['Active', 'Pending', 'Disabled'];
 
+async function requestUsers(signal?: AbortSignal): Promise<User[]> {
+  const response = await fetch(apiUrl('/users'), { signal });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Cannot load users');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
 export default function UserPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchName, setSearchName] = useState('');
@@ -58,22 +69,38 @@ export default function UserPage() {
     setError('');
 
     try {
-      const res = await fetch(apiUrl('/users'));
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Cannot load users');
-        return;
-      }
-
-      setUsers(Array.isArray(data) ? data : []);
-    } catch {
-      setError('Cannot connect to backend server');
+      setUsers(await requestUsers());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Cannot connect to backend server',
+      );
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    const controller = new AbortController();
+
+    void requestUsers(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setUsers(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Cannot connect to backend server',
+        );
+      });
+
+    return () => controller.abort();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -165,7 +192,7 @@ export default function UserPage() {
       }
 
       setDialogOpen(false);
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -186,7 +213,7 @@ export default function UserPage() {
         return;
       }
 
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -214,7 +241,7 @@ export default function UserPage() {
       }
 
       setSelectedIds([]);
-      fetchUsers();
+      void fetchUsers();
     } catch {
       setError('Cannot connect to backend server');
     }
@@ -428,5 +455,4 @@ export default function UserPage() {
     </DashboardLayout>
   );
 }
-
 

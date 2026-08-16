@@ -177,29 +177,42 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchCompanies = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await fetch(apiUrl('/companies'));
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Cannot load dashboard data');
-        return;
-      }
-
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch {
-      setError('Cannot connect to backend server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchCompanies();
+    const controller = new AbortController();
+
+    void fetch(apiUrl('/companies'), { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Cannot load dashboard data');
+        }
+
+        return Array.isArray(data) ? data : [];
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCompanies(data);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Cannot connect to backend server',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
   }, []);
 
   const cards = useMemo(() => {
@@ -430,5 +443,4 @@ export default function DashboardPage() {
     </DashboardLayout>
   );
 }
-
 

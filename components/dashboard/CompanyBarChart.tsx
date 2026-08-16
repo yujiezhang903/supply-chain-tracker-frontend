@@ -96,6 +96,84 @@ function toOptionalNumber(value: string) {
   return Number.isFinite(number) ? number : undefined;
 }
 
+function getResponseMessage(value: unknown, fallback: string) {
+  if (typeof value !== 'object' || value === null || !('message' in value)) {
+    return fallback;
+  }
+
+  const message = value.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
+function getCityOptions(companies: Company[], countries: string[]) {
+  return Array.from(
+    new Set(
+      companies
+        .filter((company) =>
+          company.country ? countries.includes(company.country) : false,
+        )
+        .map((company) => company.city)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ).sort();
+}
+
+async function requestCompanies(signal?: AbortSignal): Promise<Company[]> {
+  const response = await fetch(apiUrl('/companies'), { signal });
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getResponseMessage(data, 'Cannot load companies'));
+  }
+
+  return Array.isArray(data) ? (data as Company[]) : [];
+}
+
+async function requestChartData(
+  selectedDimension: Dimension,
+  selectedFilters: FilterState,
+  signal?: AbortSignal,
+): Promise<ChartResult> {
+  const requestBody = {
+    dimension: selectedDimension,
+    filter: {
+      level: selectedFilters.level,
+      country: selectedFilters.country,
+      city: selectedFilters.city,
+      founded_year: {
+        start: toOptionalNumber(selectedFilters.foundedYearStart),
+        end: toOptionalNumber(selectedFilters.foundedYearEnd),
+      },
+      annual_revenue: {
+        min: toOptionalNumber(selectedFilters.annualRevenueMin),
+        max: toOptionalNumber(selectedFilters.annualRevenueMax),
+      },
+      employees: {
+        min: toOptionalNumber(selectedFilters.employeesMin),
+        max: toOptionalNumber(selectedFilters.employeesMax),
+      },
+    },
+  };
+
+  const response = await fetch(apiUrl('/dashboard/companies/filter'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+    signal,
+  });
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      getResponseMessage(data, 'Cannot load company chart data'),
+    );
+  }
+
+  return data as ChartResult;
+}
+
 /**
  * Own linked company filters and switch between aggregate and hierarchy views.
  * Draft filters are submitted explicitly to avoid a request on every keystroke.
@@ -105,8 +183,6 @@ export default function CompanyBarChart() {
   const [chartView, setChartView] = useState<ChartView>('bar');
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
 
-  const [levelOptions, setLevelOptions] = useState<string[]>([]);
-  const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
 
   const [result, setResult] = useState<ChartResult>({
@@ -123,68 +199,29 @@ export default function CompanyBarChart() {
   const [error, setError] = useState('');
   const chartRequestIdRef = useRef(0);
 
-  const loadFilterOptions = useCallback(async () => {
-    try {
-      const response = await fetch(apiUrl('/companies'));
-      const companies: Company[] = await response.json();
-
-      if (!response.ok || !Array.isArray(companies)) {
-        return;
-      }
-
-      setCompanies(companies);
-
-      setLevelOptions(
-        Array.from(
-          new Set(
-            companies
-              .map((company) => company.level)
-              .filter((value): value is string => Boolean(value))
-          )
-        ).sort()
-      );
-
-      setCountryOptions(
-        Array.from(
-          new Set(
-            companies
-              .map((company) => company.country)
-              .filter((value): value is string => Boolean(value))
-          )
-        ).sort()
-      );
-
-    } catch {
-      // The chart request below will display the main connection error.
-    }
-  }, []);
-
-  const cityOptions = useMemo(() => {
+  const levelOptions = useMemo(() => {
     return Array.from(
       new Set(
         companies
-          .filter((company) =>
-            company.country
-              ? filters.country.includes(company.country)
-              : false
-          )
-          .map((company) => company.city)
-          .filter((value): value is string => Boolean(value))
-      )
+          .map((company) => company.level)
+          .filter((value): value is string => Boolean(value)),
+      ),
     ).sort();
+  }, [companies]);
+
+  const countryOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        companies
+          .map((company) => company.country)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ).sort();
+  }, [companies]);
+
+  const cityOptions = useMemo(() => {
+    return getCityOptions(companies, filters.country);
   }, [companies, filters.country]);
-
-  useEffect(() => {
-    setFilters((current) => {
-      const city = current.city.filter((value) =>
-        cityOptions.includes(value)
-      );
-
-      return city.length === current.city.length
-        ? current
-        : { ...current, city };
-    });
-  }, [cityOptions]);
 
   const fetchChartData = useCallback(
     async (
@@ -195,55 +232,22 @@ export default function CompanyBarChart() {
       setLoading(true);
       setError('');
 
-      const requestBody = {
-        dimension: selectedDimension,
-        filter: {
-          level: selectedFilters.level,
-          country: selectedFilters.country,
-          city: selectedFilters.city,
-          founded_year: {
-            start: toOptionalNumber(selectedFilters.foundedYearStart),
-            end: toOptionalNumber(selectedFilters.foundedYearEnd),
-          },
-          annual_revenue: {
-            min: toOptionalNumber(selectedFilters.annualRevenueMin),
-            max: toOptionalNumber(selectedFilters.annualRevenueMax),
-          },
-          employees: {
-            min: toOptionalNumber(selectedFilters.employeesMin),
-            max: toOptionalNumber(selectedFilters.employeesMax),
-          },
-        },
-      };
-
       try {
-        const response = await fetch(
-          apiUrl('/dashboard/companies/filter'),
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          }
+        const data = await requestChartData(
+          selectedDimension,
+          selectedFilters,
         );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          if (requestId === chartRequestIdRef.current) {
-            setError(data.message || 'Cannot load bar chart data');
-          }
-
-          return;
-        }
 
         if (requestId === chartRequestIdRef.current) {
           setResult(data);
         }
-      } catch {
+      } catch (requestError) {
         if (requestId === chartRequestIdRef.current) {
-          setError('Cannot connect to backend server');
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'Cannot connect to backend server',
+          );
         }
       } finally {
         // A slower previous request must not clear the loading state or
@@ -257,18 +261,59 @@ export default function CompanyBarChart() {
   );
 
   useEffect(() => {
-    loadFilterOptions();
-  }, [loadFilterOptions]);
+    const controller = new AbortController();
+
+    void requestCompanies(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCompanies(data);
+        }
+      })
+      .catch(() => {
+        // The chart request below displays the primary connection error.
+      });
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
-    fetchChartData(dimension, filters);
-    // Only reload automatically when the selected dimension changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimension]);
+    const controller = new AbortController();
+    const requestId = ++chartRequestIdRef.current;
+
+    void requestChartData('level', emptyFilters, controller.signal)
+      .then((data) => {
+        if (requestId === chartRequestIdRef.current) {
+          setResult(data);
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (requestId === chartRequestIdRef.current) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'Cannot connect to backend server',
+          );
+        }
+      })
+      .finally(() => {
+        if (
+          !controller.signal.aborted &&
+          requestId === chartRequestIdRef.current
+        ) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const handleReset = () => {
     setFilters(emptyFilters);
-    fetchChartData(dimension, emptyFilters);
+    void fetchChartData(dimension, emptyFilters);
   };
 
   const chartData = useMemo(
@@ -372,9 +417,11 @@ export default function CompanyBarChart() {
           <Select
             value={dimension}
             label="Dimension"
-            onChange={(event) =>
-              setDimension(event.target.value as Dimension)
-            }
+            onChange={(event) => {
+              const nextDimension = event.target.value as Dimension;
+              setDimension(nextDimension);
+              void fetchChartData(nextDimension, filters);
+            }}
           >
             <MenuItem value="level">Level</MenuItem>
             <MenuItem value="country">Country</MenuItem>
@@ -416,11 +463,16 @@ export default function CompanyBarChart() {
             value={filters.country}
             onChange={(event) => {
               const value = event.target.value;
+              const country =
+                typeof value === 'string' ? value.split(',') : value;
+              const validCities = new Set(
+                getCityOptions(companies, country),
+              );
 
               setFilters({
                 ...filters,
-                country:
-                  typeof value === 'string' ? value.split(',') : value,
+                country,
+                city: filters.city.filter((item) => validCities.has(item)),
               });
             }}
             input={<OutlinedInput label="Country" />}
@@ -537,7 +589,7 @@ export default function CompanyBarChart() {
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <Button
           variant="contained"
-          onClick={() => fetchChartData()}
+          onClick={() => void fetchChartData()}
           disabled={loading}
         >
           Apply Filters
